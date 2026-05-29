@@ -1,0 +1,7 @@
+flask
+pandas
+plotly
+numpy
+openpyxl
+matplotlib
+yfinance

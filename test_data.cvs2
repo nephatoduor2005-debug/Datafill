@@ -1,0 +1,25 @@
+import yfinance as yf
+import pandas as pd
+import numpy as np
+
+# Download Apple stock data for the last 20 days (clean, continuous data)
+df = yf.download('AAPL', period='1mo', interval='1d')
+
+# Reset index to have 'Date' as a column
+df.reset_index(inplace=True)
+
+# Create the dataset in the format your tool expects (x = Date, y = Close Price)
+test_data = df[['Date', 'Close']].copy()
+
+# Rename columns to match DataFill
+test_data.columns = ['x', 'y']
+
+# INTENTIONALLY INTRODUCE A GAP for your tool to test!
+# Set two random rows to NaN (missing value)
+test_data.iloc[5, 1] = np.nan  # 6th day
+test_data.iloc[12, 1] = np.nan # 13th day
+
+# Save to CSV
+test_data.to_csv('test_stock_data.csv', index=False)
+
+print("Test CSV saved! Open 'test_stock_data.csv' in DataFill to interpolate the missing stock prices.")

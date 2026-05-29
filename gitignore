@@ -1,0 +1,5 @@
+temp_data.csv
+temp_ts_data.csv
+__pycache__/
+*.pyc
+.env

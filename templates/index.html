@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataFill — Fill the gaps. Find the pattern.</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5; padding: 20px; color: #333;
+        }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 25px; }
+        .header h1 { font-size: 2.2em; color: #1a1a2e; }
+        .header .logo {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header .tagline { color: #666; font-size: 1.1em; font-style: italic; }
+        .card {
+            background: white; border-radius: 12px; padding: 24px;
+            margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .card h3 { margin-bottom: 15px; color: #1a1a2e; border-bottom: 2px solid #eee; padding-bottom: 8px; }
+        .upload-area {
+            border: 2px dashed #ccc; border-radius: 8px; padding: 25px;
+            text-align: center; transition: border-color 0.3s;
+        }
+        .upload-area:hover { border-color: #4f46e5; }
+        input[type="file"] { margin-bottom: 10px; }
+        input[type="number"], input[type="text"] {
+            padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px;
+            font-size: 15px; width: 180px;
+        }
+        select {
+            padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px;
+            font-size: 15px; margin-left: 8px;
+        }
+        .btn {
+            padding: 10px 20px; background: #4f46e5; color: white;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 15px;
+            transition: background 0.2s; text-decoration: none; display: inline-block;
+        }
+        .btn:hover { background: #4338ca; }
+        .btn-green { background: #059669; }
+        .btn-green:hover { background: #047857; }
+        .btn-orange { background: #d97706; }
+        .btn-orange:hover { background: #b45309; }
+        .interp-form {
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 15px;
+        }
+        .result-box {
+            background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+            border-left: 4px solid #4f46e5; padding: 16px 20px;
+            border-radius: 6px; margin-top: 15px;
+        }
+        .result-box strong { font-size: 1.2em; color: #4f46e5; }
+        .warning-box {
+            background: #fff3cd; border-left: 4px solid #f59e0b;
+            padding: 12px 16px; border-radius: 6px; margin-top: 12px; color: #856404;
+        }
+        .error-box {
+            background: #fee2e2; border-left: 4px solid #ef4444;
+            padding: 12px 16px; border-radius: 6px; margin-top: 12px; color: #991b1b;
+        }
+        .table {
+            width: 100%; border-collapse: collapse; font-size: 0.9em;
+        }
+        .table th, .table td {
+            padding: 8px 12px; border: 1px solid #ddd; text-align: center;
+        }
+        .table th { background: #f8fafc; font-weight: 600; }
+        .table tr:hover { background: #f1f5f9; }
+        .btn-group { margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+        .badge {
+            display: inline-block; background: #dbeafe; color: #1e40af;
+            padding: 4px 12px; border-radius: 20px; font-size: 0.85em; margin-left: 10px;
+        }
+        .badge-green { background: #d1fae5; color: #065f46; }
+        .footer { text-align: center; color: #999; font-size: 0.85em; padding: 20px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📊 <span class="logo">DataFill</span></h1>
+        <p class="tagline">Fill the gaps. Find the pattern.</p>
+    </div>
+
+    {% if error %}
+    <div class="card error-box"><strong>Error:</strong> {{ error }}</div>
+    {% endif %}
+
+    <!-- Stock Fetch Card -->
+    <div class="card">
+        <h3>📈 Fetch Live Stock Data</h3>
+        <form action="/fetch_stock" method="POST" class="interp-form">
+            <label><strong>Ticker:</strong></label>
+            <input type="text" name="ticker" placeholder="AAPL" value="AAPL" required>
+            <label><strong>Period:</strong></label>
+            <select name="period">
+                <option value="1mo">1 Month</option>
+                <option value="3mo">3 Months</option>
+                <option value="6mo">6 Months</option>
+                <option value="1y">1 Year</option>
+                <option value="2y">2 Years</option>
+            </select>
+            <button type="submit" class="btn">Fetch & Analyze</button>
+        </form>
+        <p style="margin-top:10px; color:#666; font-size:0.9em;">
+            Downloads real market data, randomly removes ~20% of trading days (simulated gaps), and prepares it for interpolation.
+        </p>
+    </div>
+
+    <!-- Upload Card -->
+    <div class="card">
+        <h3>📂 Upload Your Own Data</h3>
+        <div class="upload-area">
+            <form method="POST" enctype="multipart/form-data">
+                <p style="margin-bottom:10px; color:#666;">
+                    CSV or Excel — equally‑spaced x-values <strong>or</strong> financial time‑series (Date column)
+                </p>
+                <input type="file" name="file" accept=".csv,.xlsx,.xls" required>
+                <br><br>
+                <button type="submit" class="btn">Upload & Process</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Interpolation Card -->
+    {% if table %}
+    <div class="card">
+        <h3>
+            {% if is_timeseries %}
+            📅 Time‑Series Interpolation {% if ticker %}for {{ ticker }}{% endif %}
+            {% else %}
+            🎯 DataFill Interpolation
+            {% endif %}
+        </h3>
+        <form method="POST" class="interp-form">
+            {% if is_timeseries %}
+            <label><strong>Estimate price for date:</strong></label>
+            <input type="text" name="interp_x" placeholder="YYYY-MM-DD" required
+                   value="{{ interp_x if interp_x else '' }}">
+            {% else %}
+            <label><strong>Find value at x =</strong></label>
+            <input type="number" name="interp_x" step="any" placeholder="e.g. 2.5" required
+                   value="{{ interp_x if interp_x else '' }}">
+            {% endif %}
+            <label><strong>Method:</strong></label>
+            <select name="method">
+                <option value="auto" {% if selected_method=='auto' %}selected{% endif %}>Auto</option>
+                <option value="forward" {% if selected_method=='forward' %}selected{% endif %}>Forward</option>
+                <option value="backward" {% if selected_method=='backward' %}selected{% endif %}>Backward</option>
+            </select>
+            <button type="submit" class="btn">{% if is_timeseries %}Estimate{% else %}Fill Gap{% endif %}</button>
+        </form>
+
+        {% if result is not none %}
+        <div class="result-box">
+            <p style="font-size:1.1em;">
+                {% if is_timeseries %}
+                Price on {{ interp_x }} =
+                {% else %}
+                f({{ "%.4f"|format(interp_x) }}) =
+                {% endif %}
+                <strong>{{ "%.6f"|format(result) }}</strong>
+                <span class="badge">{{ method_used|title }} Formula</span>
+            </p>
+            {% if accuracy %}<p style="color:#666; font-size:0.9em;">{{ accuracy|safe }}</p>{% endif %}
+        </div>
+        {% endif %}
+        {% if warning %}<div class="warning-box">{{ warning }}</div>{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Data Table -->
+    {% if table %}
+    <div class="card">
+        <h3>📋 Data Summary</h3>
+        {{ table|safe }}
+    </div>
+    {% endif %}
+
+    <!-- Difference Table -->
+    {% if diff_rows %}
+    <div class="card">
+        <h3>🔢 Forward Difference Table</h3>
+        <p style="color:#666; font-size:0.85em; margin-bottom:10px;">
+            Δ¹ = first difference, Δ² = second difference, etc.
+        </p>
+        <div style="overflow-x:auto;">
+            <table class="table">
+                <thead><tr>{% for h in diff_headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+                <tbody>
+                {% for row in diff_rows %}
+                <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Chart -->
+    {% if chart %}
+    <div class="card">
+        <h3>📈 DataFill Chart</h3>
+        {{ chart|safe }}
+        <div class="btn-group">
+            <a href="/download/png" class="btn">📥 Download Chart (PNG)</a>
+            <a href="/download/csv" class="btn btn-green">📥 Download Data (CSV)</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Missing Value Imputation (only for stock fetch with gaps) -->
+    {% if is_timeseries and original_missing_dates %}
+    <div class="card" style="background:#fffbeb;">
+        <h3>🧩 Fill Missing Trading Days (Random Gaps)</h3>
+        <p style="margin-bottom:10px;">
+            The following dates were randomly removed: 
+            <strong>{{ original_missing_dates[:5]|join(', ') }}{% if original_missing_dates|length > 5 %} ...{% endif %}</strong>
+        </p>
+        <a href="/fill_missing" class="btn btn-orange">📥 Download Filled Missing Days (CSV)</a>
+    </div>
+    {% endif %}
+
+    <!-- Full Calendar Fill -->
+    {% if is_timeseries %}
+    <div class="card" style="background:#f0fdf4;">
+        <h3>🧹 Clean Data Service — <span style="color:#059669;">Full Calendar</span></h3>
+        <p style="margin-bottom:10px;">
+            Get a complete daily dataset (including weekends and holidays) with all gaps filled.
+        </p>
+        <a href="/fill_gaps" class="btn btn-green">📥 Download Filled Calendar (CSV)</a>
+    </div>
+    {% endif %}
+
+    <!-- Help -->
+    <div class="card" style="background:#f8fafc;">
+        <h3>💡 How DataFill Works</h3>
+        <ul style="padding-left:20px; line-height:1.8; color:#555;">
+            <li><strong>Regular mode:</strong> Upload equally‑spaced data and interpolate any x.</li>
+            <li><strong>Financial mode:</strong> Upload with a Date column, or fetch live stock; estimate prices for weekends/holidays.</li>
+            <li><strong>Missing value imputation:</strong> Automatically fills randomly removed trading days.</li>
+            <li><strong>Auto method</strong> picks the best formula (Forward/Backward).</li>
+        </ul>
+    </div>
+
+    <div class="footer">
+        <p>DataFill — Fill the gaps. Find the pattern. | Newton‑Gregory Interpolation Engine</p>
+    </div>
+</div>
+</body>
+</html>
