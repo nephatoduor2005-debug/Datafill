@@ -1,7 +1,8 @@
 flask
+gunicorn
 pandas
-plotly
 numpy
-openpyxl
 matplotlib
+plotly
 yfinance
+openpyxl
