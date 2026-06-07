@@ -6,3 +6,4 @@ openpyxl
 matplotlib
 yfinance
 scipy
+gunicorn
