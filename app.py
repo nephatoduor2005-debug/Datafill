@@ -1,33 +1,48 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, redirect, url_for, session
 import pandas as pd
 import plotly.express as px
 import numpy as np
 import io
 import os
+import uuid
 from datetime import datetime, timedelta
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import yfinance as yf
+from scipy.interpolate import interp1d, CubicSpline
 
 app = Flask(__name__)
+app.secret_key = 'your-secret-key-change-this'  # Change to a random string in production
 
-# ============================================
-#  DataFill – Fill the gaps. Find the pattern.
-#  Newton‑Gregory Interpolation + Stocks
-# ============================================
-
+# ---------- Per‑session storage ----------
+client_data = {}       # key = session_id, value = dict like old stored_data
 stock_cache = {}
 CACHE_LIMIT_SECONDS = 300
 
-stored_data = {
-    'is_timeseries': False,
-    'date_col': None,
-    'price_col': None,
-    'original_missing_dates': []
-}
+def get_session_id():
+    if 'session_id' not in session:
+        session['session_id'] = str(uuid.uuid4())
+    return session['session_id']
 
-# ---------- Newton‑Gregory Core ----------
+def get_data():
+    sid = get_session_id()
+    if sid not in client_data:
+        client_data[sid] = {
+            'is_timeseries': False,
+            'date_col': None,
+            'price_col': None,
+            'original_missing_dates': [],
+            'raw_file_path': None,
+            'columns': [],
+            'selected_x': None,
+            'selected_y': None,
+            'data_loaded': False,
+            'client_name': '',
+        }
+    return client_data[sid]
+
+# ---------- Interpolation functions (unchanged) ----------
 def newton_gregory_forward(x_table, y_table, x):
     n = len(y_table)
     h = x_table[1] - x_table[0]
@@ -83,7 +98,7 @@ def newton_gregory_backward(x_table, y_table, x):
             break
     return result, v, backward_diffs, terms, h
 
-def interpolate(x_table, y_table, x, method='auto'):
+def interpolate_ng(x_table, y_table, x, method='auto'):
     n = len(y_table)
     h = x_table[1] - x_table[0]
     u = (x - x_table[0]) / h
@@ -103,6 +118,35 @@ def interpolate(x_table, y_table, x, method='auto'):
             return newton_gregory_forward(x_table, y_table, x) + ('forward',)
         else:
             return newton_gregory_backward(x_table, y_table, x) + ('backward',)
+
+def interpolate_linear(x_table, y_table, x):
+    f = interp1d(x_table, y_table, kind='linear', fill_value='extrapolate')
+    return float(f(x)), 0, [], 0, 0, 'linear'
+
+def interpolate_spline(x_table, y_table, x):
+    cs = CubicSpline(x_table, y_table, extrapolate=True)
+    return float(cs(x)), 0, [], 0, 0, 'cubic_spline'
+
+def universal_interpolate(x_table, y_table, x, method='auto'):
+    if method in ['ng_auto', 'ng_forward', 'ng_backward']:
+        h = x_table[1] - x_table[0]
+        if not np.allclose(np.diff(x_table), h, rtol=1e-5):
+            raise ValueError("x-values are not equally spaced – use Linear or Spline instead.")
+        ng_method = method.replace('ng_', '')
+        return interpolate_ng(x_table, y_table, x, ng_method)
+    elif method == 'linear':
+        return interpolate_linear(x_table, y_table, x)
+    elif method == 'spline':
+        return interpolate_spline(x_table, y_table, x)
+    else:
+        try:
+            h = x_table[1] - x_table[0]
+            if np.allclose(np.diff(x_table), h, rtol=1e-5):
+                return interpolate_ng(x_table, y_table, x, 'auto')
+            else:
+                return interpolate_linear(x_table, y_table, x)
+        except:
+            return interpolate_linear(x_table, y_table, x)
 
 def build_difference_table(x_vals, y_vals, max_rows=8, max_diffs=6):
     n = len(y_vals)
@@ -167,153 +211,217 @@ def create_matplotlib_chart(df, x_col, y_col, date_x=False):
 # ---------- Routes ----------
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    table_html = chart_html = error_msg = None
-    interp_result = interp_x = None
-    method_used = param_value = None
-    accuracy_note = warning_msg = None
-    diff_headers = diff_rows = None
-    method_selected = 'auto'
-    is_timeseries = stored_data.get('is_timeseries', False)
+    # Ensure session exists
+    get_session_id()
 
     if request.method == 'POST':
-        try:
-            # --- File Upload ---
-            if 'file' in request.files and request.files['file'].filename:
-                file = request.files['file']
+        # --- File Upload ---
+        if 'file' in request.files and request.files['file'].filename:
+            file = request.files['file']
+            try:
                 df = pd.read_csv(file) if file.filename.endswith('.csv') else pd.read_excel(file)
                 if len(df.columns) < 2:
                     raise ValueError("File must have at least 2 columns")
-                
-                date_col = None
+                # Save under session
+                sid = get_session_id()
+                raw_path = f'temp_raw_{sid}.csv'
+                df.to_csv(raw_path, index=False)
+                data = get_data()
+                data['raw_file_path'] = raw_path
+                data['columns'] = list(df.columns)
+                data['selected_x'] = df.columns[0]
+                data['selected_y'] = df.columns[1] if len(df.columns) > 1 else df.columns[0]
+                data['is_timeseries'] = False
+                return redirect(url_for('data'))
+            except Exception as e:
+                return render_template('index.html', error=str(e))
+
+        # --- Manual Data Entry ---
+        elif 'manual_data' in request.form and request.form['manual_data'].strip():
+            raw_text = request.form['manual_data'].strip()
+            # Try comma or tab separated
+            try:
+                lines = raw_text.split('\n')
+                if not lines:
+                    raise ValueError("No data entered")
+                # Use first line as header
+                header = lines[0].split(',') if ',' in lines[0] else lines[0].split('\t')
+                rows = []
+                for line in lines[1:]:
+                    if line.strip():
+                        vals = line.split(',') if ',' in line else line.split('\t')
+                        rows.append(vals)
+                df = pd.DataFrame(rows, columns=header)
+                # Convert to numeric if possible
                 for col in df.columns:
-                    if 'date' in col.lower():
-                        date_col = col
-                        break
-                if date_col is None:
-                    try:
-                        pd.to_datetime(df.iloc[:,0])
-                        date_col = df.columns[0]
-                    except:
-                        pass
-                
-                if date_col:
-                    price_col = df.columns[1] if df.columns[1] != date_col else df.columns[2]
-                    display_df = df[[date_col, price_col]].copy()
-                    display_df[date_col] = pd.to_datetime(display_df[date_col])
-                    table_html = display_df.to_html(classes='table', index=False)
-                    
-                    fig = px.line(display_df.dropna(), x=date_col, y=price_col,
-                                  title=f"DataFill — {price_col} vs {date_col}", markers=True)
+                    df[col] = pd.to_numeric(df[col], errors='ignore')
+            except:
+                raise ValueError("Could not parse manual data. Use comma or tab separated lines. First line = column names.")
+            if len(df.columns) < 2:
+                raise ValueError("You must have at least 2 columns (X and Y).")
+            sid = get_session_id()
+            raw_path = f'temp_raw_{sid}.csv'
+            df.to_csv(raw_path, index=False)
+            data = get_data()
+            data['raw_file_path'] = raw_path
+            data['columns'] = list(df.columns)
+            data['selected_x'] = df.columns[0]
+            data['selected_y'] = df.columns[1]
+            data['is_timeseries'] = False
+            # Store optional client name
+            data['client_name'] = request.form.get('client_name', '').strip()
+            return redirect(url_for('data'))
+
+    return render_template('index.html')
+
+@app.route('/data', methods=['GET', 'POST'])
+def data():
+    sid = get_session_id()
+    data = get_data()
+    if not data.get('raw_file_path') or not os.path.exists(data.get('raw_file_path', '')):
+        return redirect(url_for('index'))
+
+    table_html = chart_html = error_msg = None
+    interp_result = interp_x = None
+    method_used = None
+    accuracy_note = warning_msg = None
+    diff_headers = diff_rows = None
+    selected_method = 'ng_auto'
+    is_timeseries = data.get('is_timeseries', False)
+    columns = data.get('columns', [])
+    selected_x = data.get('selected_x', '')
+    selected_y = data.get('selected_y', '')
+
+    if request.method == 'POST':
+        try:
+            # Column mapping confirmation
+            if 'confirm_columns' in request.form:
+                x_col = request.form.get('x_col', selected_x)
+                y_col = request.form.get('y_col', selected_y)
+                data['selected_x'] = x_col
+                data['selected_y'] = y_col
+                df = pd.read_csv(data['raw_file_path'])
+
+                # Detect date
+                try:
+                    pd.to_datetime(df[x_col])
+                    is_date = True
+                except:
+                    is_date = False
+
+                if is_date:
+                    data['is_timeseries'] = True
+                    data['date_col'] = x_col
+                    data['price_col'] = y_col
+                    display_df = df[[x_col, y_col]].copy()
+                    display_df[x_col] = pd.to_datetime(display_df[x_col])
+                    table_html = display_df.head(1000).to_html(classes='table', index=False)
+                    fig = px.line(display_df.dropna(), x=x_col, y=y_col,
+                                  title=f"DataFill — {y_col} vs {x_col}", markers=True)
                     fig.update_layout(template="plotly_white")
                     chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
-                    
-                    ts_df = prepare_time_series(df, date_col, price_col)
-                    ts_df.to_csv('temp_ts_data.csv', index=False)
-                    
-                    stored_data['is_timeseries'] = True
-                    stored_data['date_col'] = date_col
-                    stored_data['price_col'] = price_col
-                    stored_data['original_missing_dates'] = []
-                    
-                    x_vals = ts_df['index_num'].tolist()
-                    y_vals = ts_df[price_col].tolist()
-                    diff_headers, diff_rows = build_difference_table(x_vals, y_vals)
+                    ts_df = prepare_time_series(df, x_col, y_col)
+                    processed_path = f'temp_ts_{sid}.csv'
+                    ts_df.to_csv(processed_path, index=False)
+                    diff_headers, diff_rows = build_difference_table(ts_df['index_num'].tolist(), ts_df[y_col].tolist())
                 else:
-                    stored_data['is_timeseries'] = False
-                    x_col, y_col = df.columns[0], df.columns[1]
+                    data['is_timeseries'] = False
                     summary = df.groupby(x_col)[y_col].sum().reset_index()
-                    summary.to_csv('temp_data.csv', index=False)
-                    
+                    processed_path = f'temp_data_{sid}.csv'
+                    summary.to_csv(processed_path, index=False)
+                    table_html = summary.head(1000).to_html(classes='table', index=False)
                     fig = px.line(summary, x=x_col, y=y_col,
                                   title=f"DataFill — {y_col} vs {x_col}", markers=True)
                     fig.update_layout(template="plotly_white")
                     chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
-                    table_html = summary.to_html(classes='table', index=False)
-                    
-                    x_vals = summary[x_col].tolist()
-                    y_vals = summary[y_col].tolist()
-                    diff_headers, diff_rows = build_difference_table(x_vals, y_vals)
-
-            # --- Interpolation Request ---
-            if 'interp_x' in request.form and request.form['interp_x'].strip():
-                raw_x = request.form['interp_x'].strip()
-                method_selected = request.form.get('method', 'auto')
-                is_ts = stored_data.get('is_timeseries', False)
-                
-                if is_ts:
                     try:
-                        target_date = pd.to_datetime(raw_x)
+                        h = summary[x_col].iloc[1] - summary[x_col].iloc[0]
+                        if np.allclose(np.diff(summary[x_col]), h, rtol=1e-5):
+                            diff_headers, diff_rows = build_difference_table(summary[x_col].tolist(), summary[y_col].tolist())
                     except:
-                        raise ValueError("Please enter a valid date (YYYY-MM-DD)")
-                    
-                    df_ts = pd.read_csv('temp_ts_data.csv')
+                        pass
+                data['data_loaded'] = True
+
+            # Interpolation request
+            elif 'interp_x' in request.form and request.form['interp_x'].strip():
+                raw_x = request.form['interp_x'].strip()
+                interp_method = request.form.get('method', 'ng_auto')
+                selected_method = interp_method
+                is_ts = data.get('is_timeseries', False)
+
+                if is_ts:
+                    df_ts = pd.read_csv(f'temp_ts_{sid}.csv')
                     df_ts['Date'] = pd.to_datetime(df_ts['Date'])
-                    price_col = stored_data['price_col']
-                    
+                    target_date = pd.to_datetime(raw_x)
                     frac_idx, exact = date_to_fractional_index(df_ts, target_date)
                     x_vals = df_ts['index_num'].tolist()
-                    y_vals = df_ts[price_col].tolist()
-                    
-                    result, param, diffs, terms, step, method_used = interpolate(
-                        x_vals, y_vals, frac_idx, method_selected)
+                    y_vals = df_ts[data['price_col']].tolist()
+                    result, param, diffs, terms, step, method_used = interpolate_ng(
+                        x_vals, y_vals, frac_idx, 'auto')
                     interp_result = result
                     interp_x = target_date.strftime('%Y-%m-%d')
-                    param_value = param
-                    
-                    accuracy_note = (
-                        f"DataFill used <strong>{method_used.title()}</strong> | "
-                        f"Index: {frac_idx:.4f} | h=1 trading day | Terms: {terms}"
-                    )
-                    if exact:
-                        accuracy_note += " (exact trading day)"
-                    else:
-                        accuracy_note += " (interpolated date)"
-                    
-                    diff_headers, diff_rows = build_difference_table(x_vals, y_vals)
+                    accuracy_note = f"Method: Newton‑Gregory (index {frac_idx:.4f})"
                 else:
                     interp_x = float(raw_x)
-                    if not os.path.exists('temp_data.csv'):
-                        raise ValueError("Please upload a CSV file first")
-                    df = pd.read_csv('temp_data.csv')
-                    x_vals = df.iloc[:,0].tolist()
-                    y_vals = df.iloc[:,1].tolist()
-                    
-                    result, param, diffs, terms, step, method_used = interpolate(
-                        x_vals, y_vals, interp_x, method_selected)
+                    df = pd.read_csv(f'temp_data_{sid}.csv')
+                    x_vals = df[data['selected_x']].tolist()
+                    y_vals = df[data['selected_y']].tolist()
+                    result, _, _, _, _, method_used = universal_interpolate(x_vals, y_vals, interp_x, interp_method)
                     interp_result = result
-                    param_value = param
-                    
-                    accuracy_note = (
-                        f"DataFill used <strong>{method_used.title()}</strong> | "
-                        f"h = {step:.4f} | Terms: {terms} | Parameter = {param:.4f}"
-                    )
-                    if method_used == 'forward' and param < 0:
-                        warning_msg = "⚠️ Extrapolating before first data point."
-                    elif method_used == 'backward' and param > 0:
-                        warning_msg = "⚠️ Extrapolating beyond last data point."
-                    
-                    diff_headers, diff_rows = build_difference_table(x_vals, y_vals)
+                    accuracy_note = f"Method: {method_used.replace('_',' ').title()}"
+                    if method_used in ['forward', 'backward']:
+                        accuracy_note += " (equally spaced)"
 
         except Exception as e:
             error_msg = str(e)
 
-    return render_template('index.html',
+    # On GET request, rebuild display if already processed
+    if request.method == 'GET' and data.get('data_loaded'):
+        is_ts = data['is_timeseries']
+        if is_ts and os.path.exists(f'temp_ts_{sid}.csv'):
+            df = pd.read_csv(f'temp_ts_{sid}.csv')
+            df['Date'] = pd.to_datetime(df['Date'])
+            price_col = data['price_col']
+            table_html = df.head(1000).to_html(classes='table', index=False)
+            fig = px.line(df, x='Date', y=price_col,
+                          title=f"DataFill — {price_col} vs Date", markers=True)
+            fig.update_layout(template="plotly_white")
+            chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+            diff_headers, diff_rows = build_difference_table(df['index_num'].tolist(), df[price_col].tolist())
+        elif not is_ts and os.path.exists(f'temp_data_{sid}.csv'):
+            df = pd.read_csv(f'temp_data_{sid}.csv')
+            x_col = data['selected_x']
+            y_col = data['selected_y']
+            table_html = df.head(1000).to_html(classes='table', index=False)
+            fig = px.line(df, x=x_col, y=y_col,
+                          title=f"DataFill — {y_col} vs {x_col}", markers=True)
+            fig.update_layout(template="plotly_white")
+            chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+            try:
+                h = df[x_col].iloc[1] - df[x_col].iloc[0]
+                if np.allclose(np.diff(df[x_col]), h, rtol=1e-5):
+                    diff_headers, diff_rows = build_difference_table(df[x_col].tolist(), df[y_col].tolist())
+            except:
+                pass
+
+    return render_template('data.html',
                            table=table_html,
                            chart=chart_html,
                            result=interp_result,
                            interp_x=interp_x,
                            method_used=method_used,
-                           param=param_value,
                            error=error_msg,
                            accuracy=accuracy_note,
                            warning=warning_msg,
                            diff_headers=diff_headers,
                            diff_rows=diff_rows,
-                           selected_method=method_selected,
+                           selected_method=selected_method,
                            is_timeseries=is_timeseries,
-                           ticker=stored_data.get('ticker', ''),
-                           original_missing_dates=stored_data.get('original_missing_dates', []))
-
+                           columns=columns,
+                           selected_x=selected_x,
+                           selected_y=selected_y,
+                           ticker=data.get('ticker', ''),
+                           original_missing_dates=data.get('original_missing_dates', []))
 
 @app.route('/fetch_stock', methods=['POST'])
 def fetch_stock():
@@ -341,7 +449,6 @@ def fetch_stock():
                 raw.columns = raw.columns.get_level_values(0)
             df = raw[['Close']].copy()
             df = df.reset_index()
-            # Detect date column name
             date_col = None
             for col in df.columns:
                 if col.lower() in ['date', 'datetime']:
@@ -353,22 +460,7 @@ def fetch_stock():
             df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
             stock_cache[cache_key] = {'data': df.copy(), 'timestamp': now}
         except Exception as e:
-            return render_template('index.html',
-                                   error=f"Stock fetch failed: {str(e)}",
-                                   table=None,
-                                   chart=None,
-                                   result=None,
-                                   interp_x=None,
-                                   method_used=None,
-                                   param=None,
-                                   accuracy=None,
-                                   warning=None,
-                                   diff_headers=None,
-                                   diff_rows=None,
-                                   selected_method='auto',
-                                   is_timeseries=False,
-                                   ticker='',
-                                   original_missing_dates=[])
+            return render_template('index.html', error=f"Stock fetch failed: {str(e)}")
 
     np.random.seed(42)
     n = len(df)
@@ -378,57 +470,37 @@ def fetch_stock():
     missing_dates = df.loc[missing_idx, 'Date'].dt.strftime('%Y-%m-%d').tolist()
     df_clean = df.drop(missing_idx).reset_index(drop=True)
 
-    df_clean.to_csv('temp_ts_data.csv', index=False)
+    sid = get_session_id()
+    processed_path = f'temp_ts_{sid}.csv'
+    df_clean.to_csv(processed_path, index=False)
 
-    stored_data['is_timeseries'] = True
-    stored_data['date_col'] = 'Date'
-    stored_data['price_col'] = 'Close'
-    stored_data['ticker'] = ticker
-    stored_data['original_missing_dates'] = missing_dates
+    data = get_data()
+    data['is_timeseries'] = True
+    data['date_col'] = 'Date'
+    data['price_col'] = 'Close'
+    data['ticker'] = ticker
+    data['original_missing_dates'] = missing_dates
+    data['selected_x'] = 'Date'
+    data['selected_y'] = 'Close'
+    data['columns'] = ['Date', 'Close']
+    data['raw_file_path'] = processed_path  # ensures /data can load it
+    data['data_loaded'] = True
 
-    table_html = df_clean.to_html(classes='table', index=False)
-
-    fig = px.line(df_clean, x='Date', y='Close',
-                  title=f"DataFill — Close of {ticker} (gaps introduced)", markers=True)
-    fig.update_layout(template="plotly_white")
-    chart_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
-
-    ts_df = prepare_time_series(df_clean, 'Date', 'Close')
-    ts_df.to_csv('temp_ts_data.csv', index=False)
-
-    x_vals = ts_df['index_num'].tolist()
-    y_vals = ts_df['Close'].tolist()
-    diff_headers, diff_rows = build_difference_table(x_vals, y_vals)
-
-    return render_template('index.html',
-                           table=table_html,
-                           chart=chart_html,
-                           result=None,
-                           interp_x=None,
-                           method_used=None,
-                           param=None,
-                           error=None,
-                           accuracy=None,
-                           warning=None,
-                           diff_headers=diff_headers,
-                           diff_rows=diff_rows,
-                           selected_method='auto',
-                           is_timeseries=True,
-                           ticker=ticker,
-                           original_missing_dates=missing_dates)
-
+    return redirect(url_for('data'))
 
 @app.route('/fill_missing', methods=['GET'])
 def fill_missing():
-    if not os.path.exists('temp_ts_data.csv'):
-        return "No time‑series data. Fetch stock or upload a file first.", 400
-    missing_dates = stored_data.get('original_missing_dates', [])
+    sid = get_session_id()
+    data = get_data()
+    if not data.get('is_timeseries') or not os.path.exists(f'temp_ts_{sid}.csv'):
+        return "No time‑series data.", 400
+    missing_dates = data.get('original_missing_dates', [])
     if not missing_dates:
-        return "No missing dates to fill.", 400
+        return "No missing dates.", 400
 
-    df_ts = pd.read_csv('temp_ts_data.csv')
+    df_ts = pd.read_csv(f'temp_ts_{sid}.csv')
     df_ts['Date'] = pd.to_datetime(df_ts['Date'])
-    price_col = stored_data['price_col']
+    price_col = data['price_col']
 
     x_vals = df_ts['index_num'].tolist()
     y_vals = df_ts[price_col].tolist()
@@ -440,88 +512,77 @@ def fill_missing():
         if exact:
             price = df_ts[df_ts['Date'] == d][price_col].values[0]
         else:
-            price, _, _, _, _, _ = interpolate(x_vals, y_vals, frac_idx, method='auto')
+            price, _, _, _, _, _ = interpolate_ng(x_vals, y_vals, frac_idx, 'auto')
         filled_rows.append({'Date': d_str, 'Estimated_Price': round(price, 4)})
 
     filled_df = pd.DataFrame(filled_rows)
     original = df_ts[['Date', price_col]].copy()
     original.columns = ['Date', 'Actual_Price']
-
-    # Fix date types
     original['Date'] = pd.to_datetime(original['Date'])
     filled_df['Date'] = pd.to_datetime(filled_df['Date'])
-
-    # Merge
     full = original.merge(filled_df, on='Date', how='outer')
     full = full.sort_values('Date')
-
     csv_data = full.to_csv(index=False)
     return send_file(io.BytesIO(csv_data.encode()), mimetype='text/csv',
                      as_attachment=True, download_name='datafill_filled_missing.csv')
 
-
 @app.route('/fill_gaps')
 def fill_gaps():
-    if not os.path.exists('temp_ts_data.csv'):
-        return "No time‑series data. Upload a file or fetch stock first.", 400
-
-    df_ts = pd.read_csv('temp_ts_data.csv')
+    sid = get_session_id()
+    data = get_data()
+    if not data.get('is_timeseries') or not os.path.exists(f'temp_ts_{sid}.csv'):
+        return "No time‑series data.", 400
+    df_ts = pd.read_csv(f'temp_ts_{sid}.csv')
     df_ts['Date'] = pd.to_datetime(df_ts['Date'])
-    price_col = stored_data.get('price_col', 'Close')
-
+    price_col = data.get('price_col', 'Close')
     start = df_ts['Date'].min()
     end = df_ts['Date'].max()
     all_dates = pd.date_range(start, end, freq='D')
-
     x_vals = df_ts['index_num'].tolist()
     y_vals = df_ts[price_col].tolist()
-
     filled = []
     for d in all_dates:
         frac_idx, exact = date_to_fractional_index(df_ts, d)
         if exact:
             price = df_ts[df_ts['Date'] == d][price_col].values[0]
         else:
-            price, _, _, _, _, _ = interpolate(x_vals, y_vals, frac_idx, method='auto')
+            price, _, _, _, _, _ = interpolate_ng(x_vals, y_vals, frac_idx, 'auto')
         filled.append({'Date': d.strftime('%Y-%m-%d'), 'Estimated_Price': round(price, 4)})
-
     filled_df = pd.DataFrame(filled)
-    csv_data = filled_df.to_csv(index=False)
-    return send_file(io.BytesIO(csv_data.encode()), mimetype='text/csv',
-                     as_attachment=True, download_name='datafill_clean_timeseries.csv')
-
+    return send_file(io.BytesIO(filled_df.to_csv(index=False).encode()),
+                     mimetype='text/csv', as_attachment=True,
+                     download_name='datafill_clean_timeseries.csv')
 
 @app.route('/download/csv')
 def download_csv():
-    if stored_data.get('is_timeseries'):
-        if not os.path.exists('temp_ts_data.csv'):
-            return "No data yet", 400
-        return send_file('temp_ts_data.csv', as_attachment=True, download_name='datafill_results.csv')
+    sid = get_session_id()
+    data = get_data()
+    if data.get('is_timeseries'):
+        path = f'temp_ts_{sid}.csv'
     else:
-        if not os.path.exists('temp_data.csv'):
-            return "No data yet", 400
-        return send_file('temp_data.csv', as_attachment=True, download_name='datafill_results.csv')
-
+        path = f'temp_data_{sid}.csv'
+    if not os.path.exists(path):
+        return "No data yet", 400
+    return send_file(path, as_attachment=True, download_name='datafill_results.csv')
 
 @app.route('/download/png')
 def download_png():
-    if stored_data.get('is_timeseries'):
-        if not os.path.exists('temp_ts_data.csv'):
-            return "No data yet", 400
-        df = pd.read_csv('temp_ts_data.csv')
+    sid = get_session_id()
+    data = get_data()
+    if data.get('is_timeseries'):
+        path = f'temp_ts_{sid}.csv'
+        df = pd.read_csv(path)
         df['Date'] = pd.to_datetime(df['Date'])
         return send_file(
-            create_matplotlib_chart(df, 'Date', stored_data['price_col'], date_x=True),
+            create_matplotlib_chart(df, 'Date', data['price_col'], date_x=True),
             mimetype='image/png', as_attachment=True, download_name='datafill_chart.png')
     else:
-        if not os.path.exists('temp_data.csv'):
-            return "No data yet", 400
-        df = pd.read_csv('temp_data.csv')
+        path = f'temp_data_{sid}.csv'
+        df = pd.read_csv(path)
         x_col, y_col = df.columns[0], df.columns[1]
         return send_file(
             create_matplotlib_chart(df, x_col, y_col),
             mimetype='image/png', as_attachment=True, download_name='datafill_chart.png')
-
 
 if __name__ == '__main__':
     app.run(debug=True)

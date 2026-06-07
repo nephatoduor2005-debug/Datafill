@@ -1,258 +1,155 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DataFill — Fill the gaps. Find the pattern.</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #f0f2f5;
+            --card-bg: rgba(255,255,255,0.7);
+            --card-border: rgba(255,255,255,0.3);
+            --text: #1a1a2e;
+            --text-secondary: #555;
+            --accent: #6c5ce7;
+            --accent-hover: #5a4bd1;
+            --shadow: 0 4px 24px rgba(0,0,0,0.06);
+            --glass-blur: blur(12px);
+            --input-bg: rgba(255,255,255,0.9);
+            --input-border: rgba(0,0,0,0.1);
+            --radius: 16px;
+            --transition: 0.25s cubic-bezier(0.2,0,0,1);
+        }
+        [data-theme="dark"] {
+            --bg: #0f0f23;
+            --card-bg: rgba(30,30,60,0.6);
+            --card-border: rgba(255,255,255,0.08);
+            --text: #eaeaea;
+            --text-secondary: #aaa;
+            --shadow: 0 4px 24px rgba(0,0,0,0.4);
+            --input-bg: rgba(20,20,40,0.8);
+            --input-border: rgba(255,255,255,0.1);
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f0f2f5; padding: 20px; color: #333;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            transition: background 0.3s, color 0.3s;
+            min-height: 100vh;
+            padding: 20px;
+            background-image: radial-gradient(circle at 20% 20%, rgba(108,92,231,0.05) 0%, transparent 50%);
         }
-        .container { max-width: 1100px; margin: 0 auto; }
-        .header { text-align: center; margin-bottom: 25px; }
-        .header h1 { font-size: 2.2em; color: #1a1a2e; }
-        .header .logo {
-            background: linear-gradient(135deg, #4f46e5, #7c3aed);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .header .tagline { color: #666; font-size: 1.1em; font-style: italic; }
-        .card {
-            background: white; border-radius: 12px; padding: 24px;
-            margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        .card h3 { margin-bottom: 15px; color: #1a1a2e; border-bottom: 2px solid #eee; padding-bottom: 8px; }
-        .upload-area {
-            border: 2px dashed #ccc; border-radius: 8px; padding: 25px;
-            text-align: center; transition: border-color 0.3s;
-        }
-        .upload-area:hover { border-color: #4f46e5; }
+        .container { max-width: 800px; margin: 0 auto; animation: fadeIn 0.6s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { font-size: 2.8em; font-weight: 700; letter-spacing: -0.5px; }
+        .logo-gradient { background: linear-gradient(135deg, #6c5ce7, #a855f7, #4f46e5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .tagline { color: var(--text-secondary); font-size: 1.1em; margin-top: 8px; }
+        .theme-toggle { position: absolute; top: 25px; right: 25px; background: var(--card-bg); backdrop-filter: var(--glass-blur); border: 1px solid var(--card-border); border-radius: 50px; padding: 6px; display: flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: var(--shadow); transition: var(--transition); }
+        .theme-toggle:hover { transform: scale(1.05); }
+        .card { background: var(--card-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow); transition: transform 0.2s, box-shadow 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,0,0,0.08); }
+        .card h3 { font-weight: 600; font-size: 1.25em; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(128,128,128,0.15); padding-bottom: 10px; }
+        .upload-area { border: 2px dashed rgba(108,92,231,0.3); border-radius: 12px; padding: 30px; text-align: center; transition: border-color 0.2s; background: rgba(108,92,231,0.02); }
+        .upload-area:hover { border-color: var(--accent); }
         input[type="file"] { margin-bottom: 10px; }
-        input[type="number"], input[type="text"] {
-            padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px;
-            font-size: 15px; width: 180px;
-        }
-        select {
-            padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px;
-            font-size: 15px; margin-left: 8px;
-        }
-        .btn {
-            padding: 10px 20px; background: #4f46e5; color: white;
-            border: none; border-radius: 6px; cursor: pointer; font-size: 15px;
-            transition: background 0.2s; text-decoration: none; display: inline-block;
-        }
-        .btn:hover { background: #4338ca; }
-        .btn-green { background: #059669; }
-        .btn-green:hover { background: #047857; }
-        .btn-orange { background: #d97706; }
-        .btn-orange:hover { background: #b45309; }
-        .interp-form {
-            display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 15px;
-        }
-        .result-box {
-            background: linear-gradient(135deg, #eef2ff, #f5f3ff);
-            border-left: 4px solid #4f46e5; padding: 16px 20px;
-            border-radius: 6px; margin-top: 15px;
-        }
-        .result-box strong { font-size: 1.2em; color: #4f46e5; }
-        .warning-box {
-            background: #fff3cd; border-left: 4px solid #f59e0b;
-            padding: 12px 16px; border-radius: 6px; margin-top: 12px; color: #856404;
-        }
-        .error-box {
-            background: #fee2e2; border-left: 4px solid #ef4444;
-            padding: 12px 16px; border-radius: 6px; margin-top: 12px; color: #991b1b;
-        }
-        .table {
-            width: 100%; border-collapse: collapse; font-size: 0.9em;
-        }
-        .table th, .table td {
-            padding: 8px 12px; border: 1px solid #ddd; text-align: center;
-        }
-        .table th { background: #f8fafc; font-weight: 600; }
-        .table tr:hover { background: #f1f5f9; }
-        .btn-group { margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
-        .badge {
-            display: inline-block; background: #dbeafe; color: #1e40af;
-            padding: 4px 12px; border-radius: 20px; font-size: 0.85em; margin-left: 10px;
-        }
-        .badge-green { background: #d1fae5; color: #065f46; }
-        .footer { text-align: center; color: #999; font-size: 0.85em; padding: 20px; }
+        input[type="text"], input[type="number"], select, textarea { padding: 12px 16px; border: 1px solid var(--input-border); border-radius: 10px; font-size: 15px; background: var(--input-bg); color: var(--text); transition: var(--transition); width: 100%; outline: none; font-family: 'Inter', sans-serif; }
+        textarea { resize: vertical; min-height: 150px; }
+        input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,92,231,0.15); }
+        .btn { padding: 12px 24px; background: linear-gradient(135deg, var(--accent), #7c3aed); color: white; border: none; border-radius: 10px; font-weight: 600; font-size: 15px; cursor: pointer; transition: var(--transition); text-decoration: none; display: inline-block; box-shadow: 0 4px 12px rgba(108,92,231,0.3); margin-top: 10px; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(108,92,231,0.4); }
+        .error-box { background: rgba(239,68,68,0.08); border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 10px; margin-top: 12px; color: #b91c1c; }
+        .footer { text-align: center; color: var(--text-secondary); font-size: 0.85em; padding: 30px 0 10px; opacity: 0.8; }
+        @media (max-width: 768px) { .header h1 { font-size: 2em; } .theme-toggle { top: 15px; right: 15px; } }
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="header">
-        <h1>📊 <span class="logo">DataFill</span></h1>
-        <p class="tagline">Fill the gaps. Find the pattern.</p>
+    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()">
+        <span id="themeIcon">🌙</span>
+        <span id="themeLabel">Dark</span>
     </div>
 
-    {% if error %}
-    <div class="card error-box"><strong>Error:</strong> {{ error }}</div>
-    {% endif %}
+    <div class="container">
+        <div class="header">
+            <h1>📊 <span class="logo-gradient">DataFill</span></h1>
+            <p class="tagline">Intelligent interpolation for any dataset</p>
+        </div>
 
-    <!-- Stock Fetch Card -->
-    <div class="card">
-        <h3>📈 Fetch Live Stock Data</h3>
-        <form action="/fetch_stock" method="POST" class="interp-form">
-            <label><strong>Ticker:</strong></label>
-            <input type="text" name="ticker" placeholder="AAPL" value="AAPL" required>
-            <label><strong>Period:</strong></label>
-            <select name="period">
-                <option value="1mo">1 Month</option>
-                <option value="3mo">3 Months</option>
-                <option value="6mo">6 Months</option>
-                <option value="1y">1 Year</option>
-                <option value="2y">2 Years</option>
-            </select>
-            <button type="submit" class="btn">Fetch & Analyze</button>
-        </form>
-        <p style="margin-top:10px; color:#666; font-size:0.9em;">
-            Downloads real market data, randomly removes ~20% of trading days (simulated gaps), and prepares it for interpolation.
-        </p>
-    </div>
+        {% if error %}
+        <div class="card error-box"><strong>Error:</strong> {{ error }}</div>
+        {% endif %}
 
-    <!-- Upload Card -->
-    <div class="card">
-        <h3>📂 Upload Your Own Data</h3>
-        <div class="upload-area">
-            <form method="POST" enctype="multipart/form-data">
-                <p style="margin-bottom:10px; color:#666;">
-                    CSV or Excel — equally‑spaced x-values <strong>or</strong> financial time‑series (Date column)
-                </p>
-                <input type="file" name="file" accept=".csv,.xlsx,.xls" required>
-                <br><br>
-                <button type="submit" class="btn">Upload & Process</button>
+        <!-- Optional client name field (visible on all forms) -->
+        <div class="card">
+            <h3>👤 Your Reference (optional)</h3>
+            <input type="text" form="upload-form" name="client_name" placeholder="e.g., client name or project ID">
+            <p style="color:var(--text-secondary); font-size:0.85em; margin-top:8px;">Helps us identify your data if you need support.</p>
+        </div>
+
+        <!-- Upload File -->
+        <div class="card">
+            <h3>📂 Upload File</h3>
+            <div class="upload-area">
+                <form method="POST" enctype="multipart/form-data" id="upload-form">
+                    <input type="file" name="file" accept=".csv,.xlsx,.xls" required>
+                    <button type="submit" class="btn">Upload & Continue</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Manual Data Entry -->
+        <div class="card">
+            <h3>✍️ Paste Data Manually</h3>
+            <form method="POST">
+                <textarea name="manual_data" placeholder="Paste your data here (comma or tab separated). First line = column names.&#10;Example:&#10;Time,Temperature&#10;1,22.5&#10;2,23.1&#10;3,22.8" required></textarea>
+                <input type="hidden" name="client_name" form="upload-form" value="">
+                <button type="submit" class="btn">Submit Data</button>
             </form>
         </div>
-    </div>
 
-    <!-- Interpolation Card -->
-    {% if table %}
-    <div class="card">
-        <h3>
-            {% if is_timeseries %}
-            📅 Time‑Series Interpolation {% if ticker %}for {{ ticker }}{% endif %}
-            {% else %}
-            🎯 DataFill Interpolation
-            {% endif %}
-        </h3>
-        <form method="POST" class="interp-form">
-            {% if is_timeseries %}
-            <label><strong>Estimate price for date:</strong></label>
-            <input type="text" name="interp_x" placeholder="YYYY-MM-DD" required
-                   value="{{ interp_x if interp_x else '' }}">
-            {% else %}
-            <label><strong>Find value at x =</strong></label>
-            <input type="number" name="interp_x" step="any" placeholder="e.g. 2.5" required
-                   value="{{ interp_x if interp_x else '' }}">
-            {% endif %}
-            <label><strong>Method:</strong></label>
-            <select name="method">
-                <option value="auto" {% if selected_method=='auto' %}selected{% endif %}>Auto</option>
-                <option value="forward" {% if selected_method=='forward' %}selected{% endif %}>Forward</option>
-                <option value="backward" {% if selected_method=='backward' %}selected{% endif %}>Backward</option>
-            </select>
-            <button type="submit" class="btn">{% if is_timeseries %}Estimate{% else %}Fill Gap{% endif %}</button>
-        </form>
-
-        {% if result is not none %}
-        <div class="result-box">
-            <p style="font-size:1.1em;">
-                {% if is_timeseries %}
-                Price on {{ interp_x }} =
-                {% else %}
-                f({{ "%.4f"|format(interp_x) }}) =
-                {% endif %}
-                <strong>{{ "%.6f"|format(result) }}</strong>
-                <span class="badge">{{ method_used|title }} Formula</span>
-            </p>
-            {% if accuracy %}<p style="color:#666; font-size:0.9em;">{{ accuracy|safe }}</p>{% endif %}
+        <!-- Stock Fetch (unchanged) -->
+        <div class="card">
+            <h3>📈 Fetch Stock Data</h3>
+            <form action="/fetch_stock" method="POST">
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <input type="text" name="ticker" placeholder="AAPL" value="AAPL" required style="flex:1;">
+                    <select name="period" style="flex:1;">
+                        <option value="1mo">1 Month</option>
+                        <option value="3mo">3 Months</option>
+                        <option value="6mo">6 Months</option>
+                        <option value="1y">1 Year</option>
+                        <option value="2y">2 Years</option>
+                    </select>
+                    <button type="submit" class="btn" style="flex:0 0 auto;">Fetch & Analyze</button>
+                </div>
+            </form>
         </div>
-        {% endif %}
-        {% if warning %}<div class="warning-box">{{ warning }}</div>{% endif %}
-    </div>
-    {% endif %}
 
-    <!-- Data Table -->
-    {% if table %}
-    <div class="card">
-        <h3>📋 Data Summary</h3>
-        {{ table|safe }}
-    </div>
-    {% endif %}
-
-    <!-- Difference Table -->
-    {% if diff_rows %}
-    <div class="card">
-        <h3>🔢 Forward Difference Table</h3>
-        <p style="color:#666; font-size:0.85em; margin-bottom:10px;">
-            Δ¹ = first difference, Δ² = second difference, etc.
-        </p>
-        <div style="overflow-x:auto;">
-            <table class="table">
-                <thead><tr>{% for h in diff_headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
-                <tbody>
-                {% for row in diff_rows %}
-                <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
-                {% endfor %}
-                </tbody>
-            </table>
+        <div class="footer">
+            <p>DataFill — Fill the gaps. Find the pattern.</p>
         </div>
     </div>
-    {% endif %}
 
-    <!-- Chart -->
-    {% if chart %}
-    <div class="card">
-        <h3>📈 DataFill Chart</h3>
-        {{ chart|safe }}
-        <div class="btn-group">
-            <a href="/download/png" class="btn">📥 Download Chart (PNG)</a>
-            <a href="/download/csv" class="btn btn-green">📥 Download Data (CSV)</a>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Missing Value Imputation (only for stock fetch with gaps) -->
-    {% if is_timeseries and original_missing_dates %}
-    <div class="card" style="background:#fffbeb;">
-        <h3>🧩 Fill Missing Trading Days (Random Gaps)</h3>
-        <p style="margin-bottom:10px;">
-            The following dates were randomly removed: 
-            <strong>{{ original_missing_dates[:5]|join(', ') }}{% if original_missing_dates|length > 5 %} ...{% endif %}</strong>
-        </p>
-        <a href="/fill_missing" class="btn btn-orange">📥 Download Filled Missing Days (CSV)</a>
-    </div>
-    {% endif %}
-
-    <!-- Full Calendar Fill -->
-    {% if is_timeseries %}
-    <div class="card" style="background:#f0fdf4;">
-        <h3>🧹 Clean Data Service — <span style="color:#059669;">Full Calendar</span></h3>
-        <p style="margin-bottom:10px;">
-            Get a complete daily dataset (including weekends and holidays) with all gaps filled.
-        </p>
-        <a href="/fill_gaps" class="btn btn-green">📥 Download Filled Calendar (CSV)</a>
-    </div>
-    {% endif %}
-
-    <!-- Help -->
-    <div class="card" style="background:#f8fafc;">
-        <h3>💡 How DataFill Works</h3>
-        <ul style="padding-left:20px; line-height:1.8; color:#555;">
-            <li><strong>Regular mode:</strong> Upload equally‑spaced data and interpolate any x.</li>
-            <li><strong>Financial mode:</strong> Upload with a Date column, or fetch live stock; estimate prices for weekends/holidays.</li>
-            <li><strong>Missing value imputation:</strong> Automatically fills randomly removed trading days.</li>
-            <li><strong>Auto method</strong> picks the best formula (Forward/Backward).</li>
-        </ul>
-    </div>
-
-    <div class="footer">
-        <p>DataFill — Fill the gaps. Find the pattern. | Newton‑Gregory Interpolation Engine</p>
-    </div>
-</div>
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('datafill-theme', next);
+            document.getElementById('themeIcon').textContent = next === 'dark' ? '☀️' : '🌙';
+            document.getElementById('themeLabel').textContent = next === 'dark' ? 'Light' : 'Dark';
+        }
+        const saved = localStorage.getItem('datafill-theme');
+        if (saved) document.documentElement.setAttribute('data-theme', saved);
+        else if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
+        // sync toggle icon
+        if (document.documentElement.getAttribute('data-theme') === 'dark') {
+            document.getElementById('themeIcon').textContent = '☀️';
+            document.getElementById('themeLabel').textContent = 'Light';
+        }
+    </script>
 </body>
 </html>
