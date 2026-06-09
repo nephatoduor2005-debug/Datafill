@@ -109,7 +109,14 @@
                     <option value="{{ col }}" {% if col == selected_y %}selected{% endif %}>{{ col }}</option>
                     {% endfor %}
                 </select>
-                <input type="hidden" name="confirm_columns" value="1">
+                <input type="hidden" name="confirm_columns" value="1"><!-- Inside the is_timeseries block, after the date input -->
+<label><strong>or +N days:</strong></label>
+<input type="number" name="days_offset" placeholder="e.g., 5" min="1">
+
+<!-- Outside the is_timeseries block, add extrapolation checkbox -->
+<label style="margin-left:10px;">
+    <input type="checkbox" name="allow_extrap" value="1"> Allow extrapolation (predict outside range)
+</label>
                 <button type="submit" class="btn">Process Data</button>
             </form>
         </div>
