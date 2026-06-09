@@ -1,248 +1,363 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataFill – The Missing Data Superpower</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>DataFill — Fill the Gap. Find the Pattern.</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #f0f2f5;
+            --card-bg: rgba(255,255,255,0.75);
+            --card-border: rgba(255,255,255,0.3);
+            --text: #1a1a2e;
+            --text-secondary: #555;
+            --accent: #6c5ce7;
+            --accent-hover: #5a4bd1;
+            --green: #059669;
+            --orange: #d97706;
+            --shadow: 0 4px 24px rgba(0,0,0,0.06);
+            --glass-blur: blur(12px);
+            --input-bg: rgba(255,255,255,0.9);
+            --input-border: rgba(0,0,0,0.1);
+            --radius: 16px;
+            --transition: 0.25s cubic-bezier(0.2,0,0,1);
+        }
+        [data-theme="dark"] {
+            --bg: #0f0f23;
+            --card-bg: rgba(30,30,60,0.6);
+            --card-border: rgba(255,255,255,0.08);
+            --text: #eaeaea;
+            --text-secondary: #aaa;
+            --shadow: 0 4px 24px rgba(0,0,0,0.4);
+            --input-bg: rgba(20,20,40,0.8);
+            --input-border: rgba(255,255,255,0.1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #f8f9fa;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            transition: background 0.3s, color 0.3s;
+            min-height: 100vh;
+            padding: 0 20px 40px;
+            background-image: radial-gradient(circle at 20% 20%, rgba(108,92,231,0.05) 0%, transparent 50%);
         }
+        .container { max-width: 1100px; margin: 0 auto; animation: fadeIn 0.6s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* --- NEW: HERO SECTION --- */
         .hero {
-            background: linear-gradient(135deg, #4a00e0 0%, #8b5cf6 100%);
-            color: white;
-            padding: 60px 20px;
-            border-radius: 0 0 30px 30px;
-            margin-bottom: 40px;
-        }
-        .hero h1 {
-            font-weight: 700;
-            font-size: 2.5rem;
-        }
-        .hero p {
-            font-size: 1.1rem;
-            opacity: 0.9;
-        }
-        .card {
-            border: none;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
-        }
-        .card:hover {
-            transform: translateY(-2px);
-        }
-        .btn-primary {
-            background: #4a00e0;
-            border: none;
-            border-radius: 8px;
-            padding: 12px 30px;
-            font-weight: 600;
-        }
-        .btn-primary:hover {
-            background: #3b00b5;
-        }
-        .feature-icon {
-            font-size: 2rem;
-            color: #4a00e0;
-        }
-        .stat-box {
-            text-align: center;
-            padding: 20px;
-            background: white;
-            border-radius: 12px;
-        }
-        .stat-number {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #4a00e0;
-        }
-        .upload-zone {
-            border: 2px dashed #dee2e6;
-            border-radius: 16px;
+            position: relative;
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+            height: 280px;
+            display: flex;
+            align-items: center;
             padding: 40px;
-            text-align: center;
-            background: #fafafa;
-            cursor: pointer;
-            transition: all 0.3s;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); /* Fallback */
         }
-        .upload-zone:hover {
-            border-color: #4a00e0;
-            background: #f5f3ff;
+        .hero-img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: brightness(0.5);
+            z-index: 0;
         }
-        .footer {
-            margin-top: 60px;
-            padding: 20px;
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            color: white;
+            max-width: 600px;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+        .hero-content h1 { font-size: 2.8rem; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.02em; }
+        .hero-content p { font-size: 1.1rem; opacity: 0.9; margin-bottom: 0; line-height: 1.6; }
+        
+        .theme-toggle { 
+            position: absolute; 
+            top: 25px; 
+            right: 25px; 
+            background: var(--card-bg); 
+            backdrop-filter: var(--glass-blur); 
+            border: 1px solid var(--card-border); 
+            border-radius: 50px; 
+            padding: 6px 12px; 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+            cursor: pointer; 
+            box-shadow: var(--shadow); 
+            transition: var(--transition); 
+            z-index: 10;
+        }
+        .theme-toggle:hover { transform: scale(1.05); }
+
+        .card { 
+            background: var(--card-bg); 
+            backdrop-filter: var(--glass-blur); 
+            -webkit-backdrop-filter: var(--glass-blur); 
+            border: 1px solid var(--card-border); 
+            border-radius: var(--radius); 
+            padding: 24px; 
+            margin-bottom: 20px; 
+            box-shadow: var(--shadow); 
+            transition: transform 0.2s, box-shadow 0.2s; 
+        }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,0,0,0.08); }
+        .card h3 { 
+            font-weight: 600; 
+            font-size: 1.25em; 
+            margin-bottom: 15px; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            border-bottom: 1px solid rgba(128,128,128,0.15); 
+            padding-bottom: 10px; 
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 10px;
+        }
+        .feature-item {
             text-align: center;
-            color: #6c757d;
+            padding: 15px;
+            background: rgba(108,92,231,0.04);
+            border-radius: 12px;
+            border: 1px solid var(--card-border);
+        }
+        .feature-item img { 
+            width: 48px; 
+            height: 48px; 
+            object-fit: contain; 
+            margin-bottom: 8px; 
+            display: block; 
+            margin-left: auto; 
+            margin-right: auto; 
+        }
+        .feature-item h4 { font-weight: 500; font-size: 0.95rem; color: var(--text-secondary); }
+
+        /* Existing styles (interpolation forms, tables, etc.) */
+        input[type="number"], input[type="text"], select { padding: 12px 16px; border: 1px solid var(--input-border); border-radius: 10px; font-size: 15px; background: var(--input-bg); color: var(--text); width: 180px; outline: none; transition: var(--transition); }
+        input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,92,231,0.15); }
+        .btn { padding: 12px 24px; background: linear-gradient(135deg, var(--accent), #7c3aed); color: white; border: none; border-radius: 10px; font-weight: 600; font-size: 15px; cursor: pointer; transition: var(--transition); text-decoration: none; display: inline-block; box-shadow: 0 4px 12px rgba(108,92,231,0.3); }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(108,92,231,0.4); }
+        .btn-green { background: linear-gradient(135deg, var(--green), #34d399); box-shadow: 0 4px 12px rgba(5,150,105,0.3); }
+        .btn-orange { background: linear-gradient(135deg, var(--orange), #f59e0b); box-shadow: 0 4px 12px rgba(217,119,6,0.3); }
+        .interp-form { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+        .radio-group { display: flex; gap: 15px; flex-wrap: wrap; align-items: center; }
+        .radio-group label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.95em; }
+        .result-box { background: linear-gradient(135deg, rgba(108,92,231,0.06), rgba(168,85,247,0.04)); border-left: 4px solid var(--accent); padding: 18px 22px; border-radius: 12px; margin-top: 18px; backdrop-filter: blur(8px); }
+        .result-box strong { font-size: 1.3em; color: var(--accent); }
+        .badge { display: inline-block; background: rgba(108,92,231,0.1); color: var(--accent); padding: 4px 14px; border-radius: 20px; font-size: 0.85em; margin-left: 10px; font-weight: 500; }
+        .table-wrapper { overflow-x: auto; border-radius: 12px; }
+        .table { width: 100%; border-collapse: collapse; font-size: 0.9em; white-space: nowrap; }
+        .table th { background: rgba(108,92,231,0.08); font-weight: 600; color: var(--text); padding: 12px 16px; text-align: center; }
+        .table td { padding: 10px 16px; border-bottom: 1px solid rgba(128,128,128,0.1); text-align: center; }
+        .table tr:hover td { background: rgba(108,92,231,0.03); }
+        .btn-group { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+        @media (max-width: 768px) {
+            .interp-form { flex-direction: column; align-items: flex-start; }
+            input[type="number"], input[type="text"], select { width: 100%; }
+            .theme-toggle { top: 15px; right: 15px; }
         }
     </style>
 </head>
 <body>
-
-    <!-- Hero Section -->
-    <div class="hero">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h1><i class="fas fa-chart-line me-2"></i>DataFill</h1>
-                    <p>The Most Underrated Superpower in Research and Data Analytics</p>
-                    <p class="mt-3">Fill the gaps. Find the pattern. Transform your messy data into a polished, analysis-ready dataset in seconds.</p>
-                </div>
-                <div class="col-md-4 text-center">
-                    <div class="stat-box">
-                        <div class="stat-number">100%</div>
-                        <div class="text-muted">Accuracy on polynomial data</div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()">
+        <span id="themeIcon">🌙</span>
+        <span id="themeLabel">Dark</span>
     </div>
 
-    <!-- Main Content -->
     <div class="container">
+        <!-- NEW: HERO SECTION WITH PHOTO -->
+        <div class="hero">
+            <!-- Replace this placeholder URL with your own high-quality image -->
+            <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2070&auto=format&fit=crop" class="hero-img" alt="Data Analytics Background">
+            <div class="hero-content">
+                <h1>DataFill</h1>
+                <p>Precision interpolation for your time-series data.<br>Fill the gaps. Find the pattern.</p>
+            </div>
+        </div>
+        
+        <a href="/" class="back-link">← Back to Home</a>
 
-        <!-- Upload Section -->
-        <div class="card mb-5">
-            <div class="card-body p-4">
-                <h4 class="card-title mb-3"><i class="fas fa-upload me-2 text-primary"></i>Upload Your Data</h4>
-                <div class="upload-zone" id="uploadZone">
-                    <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                    <h5>Drop your CSV or Excel file here</h5>
-                    <p class="text-muted">Or click to browse your files</p>
-                    <input type="file" id="fileInput" accept=".csv,.xlsx" style="display:none;">
+        {% if error %}
+        <div class="card error-box"><strong>Error:</strong> {{ error }}</div>
+        {% endif %}
+
+        <!-- FEATURES SECTION (NEW) -->
+        <div class="card">
+            <h3>⚡ How DataFill Works</h3>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <img src="https://cdn-icons-png.flaticon.com/512/2921/2921822.png" alt="Upload Icon">
+                    <h4>Upload</h4>
+                    <p>CSV or Excel files</p>
                 </div>
-                <div id="fileInfo" class="mt-3" style="display:none;">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span><i class="fas fa-file-csv text-primary"></i> <span id="fileName">file.csv</span></span>
-                        <button class="btn btn-primary" id="uploadBtn">Upload & Select Columns</button>
-                    </div>
+                <div class="feature-item">
+                    <img src="https://cdn-icons-png.flaticon.com/512/2907/2907192.png" alt="Map Icon">
+                    <h4>Map</h4>
+                    <p>Choose X & Y columns</p>
+                </div>
+                <div class="feature-item">
+                    <img src="https://cdn-icons-png.flaticon.com/512/1962/1962791.png" alt="Calculate Icon">
+                    <h4>Interpolate</h4>
+                    <p>Newton-Gregory Method</p>
+                </div>
+                <div class="feature-item">
+                    <img src="https://cdn-icons-png.flaticon.com/512/4091/4091380.png" alt="Visualize Icon">
+                    <h4>Visualize</h4>
+                    <p>Charts & Difference Tables</p>
                 </div>
             </div>
         </div>
 
-        <!-- Column Selection (Hidden) -->
-        <div id="processSection" style="display:none;" class="card mb-5">
-            <div class="card-body p-4">
-                <h4 class="card-title mb-3"><i class="fas fa-sliders-h me-2 text-primary"></i>Select Columns</h4>
-                <div class="row">
-                    <div class="col-md-6">
-                        <label class="fw-bold">X Column (Time / Index / Date)</label>
-                        <select id="xColSelect" class="form-select mb-3"></select>
-                        <small class="text-muted">This is your independent variable</small>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="fw-bold">Y Column (Values to fill)</label>
-                        <select id="yColSelect" class="form-select mb-3"></select>
-                        <small class="text-muted">This is your dependent variable</small>
-                    </div>
+        <!-- Column Mapping -->
+        {% if columns and not table %}
+        <div class="card">
+            <h3>🔧 Map Your Columns</h3>
+            <form method="POST" class="interp-form">
+                <label><strong>X (independent):</strong></label>
+                <select name="x_col">
+                    {% for col in columns %}
+                    <option value="{{ col }}" {% if col == selected_x %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+                <label><strong>Y (dependent):</strong></label>
+                <select name="y_col">
+                    {% for col in columns %}
+                    <option value="{{ col }}" {% if col == selected_y %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+                <input type="hidden" name="confirm_columns" value="1">
+                <button type="submit" class="btn">Process Data</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <!-- Interpolation Card -->
+        {% if table %}
+        <div class="card">
+            <h3>
+                {% if is_timeseries %}📅 Time‑Series Interpolation{% else %}🎯 DataFill Interpolation{% endif %}
+                {% if ticker %}for {{ ticker }}{% endif %}
+            </h3>
+            <form method="POST" class="interp-form">
+                {% if is_timeseries %}
+                <label><strong>Estimate {{ selected_y }} for date:</strong></label>
+                <input type="text" name="interp_x" placeholder="YYYY-MM-DD" required
+                       value="{{ interp_x if interp_x else '' }}">
+                {% else %}
+                <label><strong>Find {{ selected_y }} at {{ selected_x }} =</strong></label>
+                <input type="number" name="interp_x" step="any" placeholder="value" required
+                       value="{{ interp_x if interp_x else '' }}">
+                <div class="radio-group">
+                    <label><input type="radio" name="method" value="ng_auto" {% if selected_method in ['ng_auto','auto'] %}checked{% endif %}> Newton‑Gregory</label>
+                    <label><input type="radio" name="method" value="linear" {% if selected_method=='linear' %}checked{% endif %}> Linear</label>
+                    <label><input type="radio" name="method" value="spline" {% if selected_method=='spline' %}checked{% endif %}> Spline</label>
                 </div>
-                <button class="btn btn-success w-100" id="processBtn">
-                    <i class="fas fa-magic me-2"></i>Fill Gaps & Generate Report
-                </button>
+                {% endif %}
+                <button type="submit" class="btn">Fill Gap</button>
+            </form>
+
+            {% if result is not none %}
+            <div class="result-box">
+                <p style="font-size:1.1em;">
+                    {% if is_timeseries %}
+                    {{ selected_y }} on {{ interp_x }} =
+                    {% else %}
+                    {{ selected_y }} at {{ selected_x }}={{ "%.4f"|format(interp_x) }} =
+                    {% endif %}
+                    <strong>{{ "%.6f"|format(result) }}</strong>
+                    <span class="badge">{{ method_used.replace('_',' ').title() if method_used else '' }}</span>
+                </p>
+                {% if accuracy %}<p style="color:var(--text-secondary); font-size:0.9em; margin-top:6px;">{{ accuracy|safe }}</p>{% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Data Preview -->
+        {% if table %}
+        <div class="card">
+            <h3>📋 Data Preview</h3>
+            <div class="table-wrapper">{{ table|safe }}</div>
+        </div>
+        {% endif %}
+
+        <!-- Difference Table -->
+        {% if diff_rows %}
+        <div class="card">
+            <h3>🔢 Forward Difference Table</h3>
+            <div class="table-wrapper">
+                <table class="table">
+                    <thead><tr>{% for h in diff_headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+                    <tbody>
+                    {% for row in diff_rows %}
+                    <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
+        {% endif %}
 
-        <!-- Results Section (Hidden) -->
-        <div id="resultsSection" style="display:none;">
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h4 class="card-title"><i class="fas fa-chart-bar me-2 text-primary"></i>Interpolation Results</h4>
-                    <div id="resultsContent"></div>
-                </div>
+        <!-- Chart -->
+        {% if chart %}
+        <div class="card">
+            <h3>📈 Chart</h3>
+            {{ chart|safe }}
+            <div class="btn-group">
+                <a href="/download/png" class="btn">📥 Download Chart (PNG)</a>
+                <a href="/download/csv" class="btn btn-green">📥 Download Data (CSV)</a>
             </div>
         </div>
+        {% endif %}
 
-    </div>
+        <!-- Stock‑specific gap filling -->
+        {% if is_timeseries and original_missing_dates %}
+        <div class="card" style="background: rgba(217,119,6,0.05);">
+            <h3>🧩 Fill Missing Trading Days</h3>
+            <p style="margin-bottom:12px;">Randomly removed: {{ original_missing_dates[:5]|join(', ') }}{% if original_missing_dates|length > 5 %} ...{% endif %}</p>
+            <a href="/fill_missing" class="btn btn-orange">📥 Download Filled Missing Days (CSV)</a>
+        </div>
+        {% endif %}
 
-    <div class="footer">
-        <p>Built with <i class="fas fa-heart text-danger"></i> by Nephat Oduor | Mawego National Polytechnic</p>
-        <p class="text-muted small">Electrical Engineering • Data Science • Python</p>
+        {% if is_timeseries %}
+        <div class="card" style="background: rgba(5,150,105,0.05);">
+            <h3>🧹 Clean Data Service — Full Calendar</h3>
+            <p style="margin-bottom:12px;">Complete daily dataset (weekends & holidays included).</p>
+            <a href="/fill_gaps" class="btn btn-green">📥 Download Filled Calendar (CSV)</a>
+        </div>
+        {% endif %}
     </div>
 
     <script>
-        // Upload zone click handler
-        document.getElementById('uploadZone').addEventListener('click', function() {
-            document.getElementById('fileInput').click();
-        });
-
-        document.getElementById('fileInput').addEventListener('change', function() {
-            if (this.files.length > 0) {
-                document.getElementById('fileName').textContent = this.files[0].name;
-                document.getElementById('fileInfo').style.display = 'block';
-            }
-        });
-
-        document.getElementById('uploadBtn').addEventListener('click', function() {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) {
-                alert('Please select a file first');
-                return;
-            }
-            const formData = new FormData();
-            formData.append('file', file);
-
-            fetch('/upload_any', {
-                method: 'POST',
-                body: formData
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
-                document.getElementById('processSection').style.display = 'block';
-                const xSelect = document.getElementById('xColSelect');
-                const ySelect = document.getElementById('yColSelect');
-                xSelect.innerHTML = '';
-                ySelect.innerHTML = '';
-
-                data.columns.forEach(col => {
-                    const xOpt = document.createElement('option');
-                    xOpt.value = col;
-                    xOpt.textContent = col;
-                    if (col === data.auto_x) xOpt.selected = true;
-                    xSelect.appendChild(xOpt);
-
-                    const yOpt = document.createElement('option');
-                    yOpt.value = col;
-                    yOpt.textContent = col;
-                    if (col === data.auto_y) yOpt.selected = true;
-                    ySelect.appendChild(yOpt);
-                });
-                window.currentFilepath = data.filepath;
-            })
-            .catch(err => alert('Upload failed: ' + err));
-        });
-
-        document.getElementById('processBtn').addEventListener('click', function() {
-            const xCol = document.getElementById('xColSelect').value;
-            const yCol = document.getElementById('yColSelect').value;
-
-            fetch('/process_any', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    filepath: window.currentFilepath,
-                    x_col: xCol,
-                    y_col: yCol
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
-                document.getElementById('resultsSection').style.display = 'block';
-                document.getElementById('resultsContent').innerHTML = data.html;
-            })
-            .catch(err => alert('Processing error: ' + err));
-        });
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('datafill-theme', next);
+            document.getElementById('themeIcon').textContent = next === 'dark' ? '☀️' : '🌙';
+            document.getElementById('themeLabel').textContent = next === 'dark' ? 'Light' : 'Dark';
+        }
+        const saved = localStorage.getItem('datafill-theme');
+        if (saved) document.documentElement.setAttribute('data-theme', saved);
+        else if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.setAttribute('data-theme', 'dark');
+        if (document.documentElement.getAttribute('data-theme') === 'dark') {
+            document.getElementById('themeIcon').textContent = '☀️';
+            document.getElementById('themeLabel').textContent = 'Light';
+        }
     </script>
 </body>
 </html>
